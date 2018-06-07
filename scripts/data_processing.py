@@ -15,7 +15,8 @@ VEHICLES = ['Car', 'Truck', 'Van', 'Tram','Pedestrian','Cyclist']
 def compute_anchors(angle):
     anchors = []
     
-    wedge = 2.*np.pi/BIN
+    #wedge = 2.*np.pi/BIN
+    wedge = np.pi/BIN
     l_index = int(angle/wedge)
     r_index = l_index + 1
     
