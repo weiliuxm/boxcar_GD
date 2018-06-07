@@ -7,7 +7,7 @@ import copy
 #####
 #Training setting
 #BIN, OVERLAP = 2, 0.1
-BIN, OVERLAP = 4, 0.05
+BIN, OVERLAP = 4, 0.1
 NORM_H, NORM_W = 224, 224
 VEHICLES = ['Car', 'Truck', 'Van', 'Tram','Pedestrian','Cyclist']
 
