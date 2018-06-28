@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import math
 
+NUM_OF_ORIENTATIONS = 3
 def perp( a ) :
     b = np.empty_like(a)
     b[0] = -a[1]
@@ -146,28 +147,29 @@ class BoxCarsDataset(object):
         v1_preds = np.asarray(v1_preds)
         v2_preds = np.asarray(v2_preds)
         v3_preds = np.asarray(v3_preds)
-        print(v1_preds)
         v1_preds = v1_preds.reshape(v1_preds.shape[0],1)
         v2_preds = v2_preds.reshape(v2_preds.shape[0],1)
         v3_preds = v3_preds.reshape(v3_preds.shape[0],1)
-        print(v1_preds)
-        print(y_categorical)
-        print(np.where(y_categorical==np.max(y_categorical)))
+#       print(v1_preds)
+#       print(y_categorical)
+#       print(np.where(y_categorical==np.max(y_categorical)))
         #return a dictionary
-        #self.Y[part] = {'cls_preds': y_categorical, orientation1_preds: orientation1_categorical, orientation2_preds: orientation2_categorical, orientation3_preds: orientation3_categorical}
-        self.Y[part] = y_categorical
+#        self.Y[part] = [y_categorical, v1_preds, v2_preds, v3_preds]
+#        self.Y[part] = {'cls_preds': y_categorical, 'orientation1_preds': v1_preds, 'orientation2_preds': v2_preds, 'orientation3_preds': v3_preds}
+        self.Y[part] = {'class_prediction': y_categorical, 'orientation1': v1_preds, 'orientation2': v2_preds, 'orientation3': v3_preds}
+        #self.Y[part] = y_categorical
         #
-        
-
-
+     
     def get_number_of_classes(self):
         return len(self.split["types_mapping"])
-        
-        
-    def evaluate(self, probabilities, part="test", top_k=1):
+
+
+
+    def evaluate(self, predictions, part="test", top_k=1):
+        probabilities = predictions[0]
         samples = self.X[part]
-        assert samples.shape[0] == probabilities.shape[0]
-        assert self.get_number_of_classes() == probabilities.shape[1]
+        assert samples.shape[0] == probabilities.shape[0]   
+        assert self.get_number_of_classes() == probabilities.shape[1]   
         part_data = self.split[part]
         probs_inds = {}
         for vehicle_id, _ in part_data:
@@ -185,4 +187,29 @@ class BoxCarsDataset(object):
                 hits.append(get_hit(probabilities[ind, :], label))
                 
         return np.mean(hits), np.mean(hits_tracks)
-       
+
+
+
+        
+    def evaluate2(self, predictions, part="test", top_k=1):
+        probabilities = predictions[0]
+        samples = self.X[part]
+        assert samples.shape[0] == probabilities.shape[0]
+        assert self.get_number_of_classes() == probabilities.shape[1]-NUM_OF_ORIENTATIONS
+        part_data = self.split[part]
+        probs_inds = {}
+        for vehicle_id, _ in part_data:
+            probs_inds[vehicle_id] = np.zeros(len(self.dataset["samples"][vehicle_id]["instances"]), dtype=int)
+        for i, (vehicle_id, instance_id) in enumerate(samples):
+            probs_inds[vehicle_id][instance_id] = i
+            
+        get_hit = lambda probs, gt: int(gt in np.argsort(probs.flatten())[-top_k:])
+        hits = []
+        hits_tracks = []
+        for vehicle_id, label in part_data:
+            inds = probs_inds[vehicle_id]
+            hits_tracks.append(get_hit(np.mean(probabilities[inds, 0:self.get_number_of_classes()], axis=0), label))
+            for ind in inds:
+                hits.append(get_hit(probabilities[ind, 0:self.get_number_of_classes()], label))
+                
+        return np.mean(hits), np.mean(hits_tracks)
