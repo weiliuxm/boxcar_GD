@@ -67,13 +67,6 @@ if model is None:
         x = Flatten()(x)
    
 
-         
-#    predictions = Dense(dataset.get_number_of_classes(), activation='softmax')(x)
-#    model = Model(input=base_model.input, output=predictions, name="%s%s"%(args.train_net, {True: "_estimated3DBB", False:""}[args.estimated_3DBB is not None]))
-#    optimizer = SGD(lr=args.lr, decay=1e-4, nesterov=True)
-#    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=["accuracy"])
-
-
 
     cls_preds = Dense(dataset.get_number_of_classes(), activation = 'softmax',name = 'class_prediction')(x)
     orientation1_preds =  Dense(1, activation = 'tanh', name = 'orientation1')(x)
@@ -81,11 +74,12 @@ if model is None:
     orientation3_preds =  Dense(1, activation = 'tanh', name = 'orientation3')(x)
 
     model = Model(input=base_model.input, output=[cls_preds, orientation1_preds, orientation2_preds, orientation3_preds],
-              name = name="%s%s"%(args.train_net+'_CG_', {True: "_estimated3DBB", False:""}[args.estimated_3DBB is not None]))
+              name = "%s%s"%(args.train_net+'_CG_', {True: "_estimated3DBB", False:""}[args.estimated_3DBB is not None]))
     optimizer = SGD(lr=args.lr, decay=1e-4, nesterov=True)
     losses=['categorical_crossentropy', tanh_loss, tanh_loss, tanh_loss]
     lossWeights = {'class_prediction':1.0,'orientation1':0.2,'orientation2':0.2,'orientation3':0.2}
-    model.compile(optimizer=optimizer, loss = losses, loss_weights = lossWeights, metrics=["accuracy"])
+    metrics = {'class_prediction':['acc'],'orientation1':['mse'],'orientation2':['mse'],'orientation3':['mse']}
+    model.compile(optimizer=optimizer, loss = losses, loss_weights = lossWeights, metrics=metrics)
 
 
 
@@ -110,18 +104,17 @@ if args.eval is None:
     dataset.initialize_data("validation")
     generator_train = BoxCarsDataGenerator(dataset, "train", args.batch_size, training_mode=True)
     generator_val = BoxCarsDataGenerator(dataset, "validation", args.batch_size, training_mode=False)
-
-
     #%% callbacks
     ensure_dir(args.tensorboard_dir)
     ensure_dir(args.snapshots_dir)
     tb_callback = TensorBoard(args.tensorboard_dir, histogram_freq=1, write_graph=False, write_images=False)
-    saver_callback = ModelCheckpoint(os.path.join(args.snapshots_dir, "model_{epoch:03d}_{val_acc:.2f}.h5"), period=4 )
+    saver_callback = ModelCheckpoint(os.path.join(args.snapshots_dir, "model_{epoch:03d}_{val_acc:.2f}.h5"), period=1 )
 
     #%% get initial epoch
     initial_epoch = 0
     if args.resume is not None:
         initial_epoch = int(os.path.basename(args.resume).split("_")[1]) + 1
+
 
 
     model.fit_generator(generator=generator_train, 
@@ -135,6 +128,7 @@ if args.eval is None:
                         )
 
     #%% save trained data
+
     print("Saving the final model to %s"%(args.output_final_model_path))
     ensure_dir(os.path.dirname(args.output_final_model_path))
     model.save(args.output_final_model_path)
