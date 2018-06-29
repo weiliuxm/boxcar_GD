@@ -43,43 +43,7 @@ for path in [args.eval, args.resume]:
         break
 
 #%% construct the model as it was not passed as an argument
-if model is None:
-    print("Initializing new %s model ..."%args.train_net)
-    if args.train_net in ("ResNet50", ):
-        base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3))
-        x = Flatten()(base_model.output)
-        
-    if args.train_net in ("VGG16", "VGG19"):
-        if args.train_net == "VGG16":
-            base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224,224,3))
-        elif args.train_net == "VGG19":
-            base_model = VGG19(weights='imagenet', include_top=False, input_shape=(224,224,3))
-        x = Flatten()(base_model.output)
-        x = Dense(4096, activation='relu', name='fc1')(x)
-        x = Dropout(0.5)(x)
-        x = Dense(4096, activation='relu', name='fc2')(x)
-        x = Dropout(0.5)(x)
 
-    if args.train_net in ("InceptionV3", ):
-        base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(224,224,3))
-        output_dim = int(base_model.outputs[0].get_shape()[1])
-        x = AveragePooling2D((output_dim, output_dim), strides=(output_dim, output_dim), name='avg_pool')(base_model.output)
-        x = Flatten()(x)
-   
-
-
-    cls_preds = Dense(dataset.get_number_of_classes(), activation = 'softmax',name = 'class_prediction')(x)
-    orientation1_preds =  Dense(1, activation = 'tanh', name = 'orientation1')(x)
-    orientation2_preds =  Dense(1, activation = 'tanh', name = 'orientation2')(x)
-    orientation3_preds =  Dense(1, activation = 'tanh', name = 'orientation3')(x)
-
-    model = Model(input=base_model.input, output=[cls_preds, orientation1_preds, orientation2_preds, orientation3_preds],
-              name = "%s%s"%(args.train_net+'_CG_', {True: "_estimated3DBB", False:""}[args.estimated_3DBB is not None]))
-    optimizer = SGD(lr=args.lr, decay=1e-4, nesterov=True)
-    losses=['categorical_crossentropy', tanh_loss, tanh_loss, tanh_loss]
-    lossWeights = {'class_prediction':1.0,'orientation1':0.2,'orientation2':0.2,'orientation3':0.2}
-    metrics = {'class_prediction':['acc'],'orientation1':['mse'],'orientation2':['mse'],'orientation3':['mse']}
-    model.compile(optimizer=optimizer, loss = losses, loss_weights = lossWeights, metrics=metrics)
 
 
 
@@ -108,7 +72,9 @@ if args.eval is None:
     ensure_dir(args.tensorboard_dir)
     ensure_dir(args.snapshots_dir)
     tb_callback = TensorBoard(args.tensorboard_dir, histogram_freq=1, write_graph=False, write_images=False)
-    saver_callback = ModelCheckpoint(os.path.join(args.snapshots_dir, "model_{epoch:03d}_{val_acc:.2f}.h5"), period=1 )
+#    saver_callback = ModelCheckpoint(os.path.join(args.snapshots_dir, "model_{epoch:03d}_{val_acc:.2f}.h5"), monitor='val_acc', period=1 )
+    saver_callback = ModelCheckpoint(os.path.join(args.snapshots_dir, "model_{epoch:03d}_{class_prediction_acc:.2f}.h5"), monitor='val_acc', period=2 )
+    #checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
     #%% get initial epoch
     initial_epoch = 0
@@ -117,7 +83,7 @@ if args.eval is None:
 
 
 
-    model.fit_generator(generator=generator_train, 
+    history = model.fit_generator(generator=generator_train, 
                         samples_per_epoch=generator_train.n,
                         nb_epoch=args.epochs,
                         verbose=1,
@@ -126,6 +92,7 @@ if args.eval is None:
                         callbacks=[tb_callback, saver_callback],
                         initial_epoch = initial_epoch,
                         )
+    print(history.history.keys())
 
     #%% save trained data
 
