@@ -213,3 +213,4 @@ class BoxCarsDataset(object):
                 hits.append(get_hit(probabilities[ind, 0:self.get_number_of_classes()], label))
                 
         return np.mean(hits), np.mean(hits_tracks)
+        
